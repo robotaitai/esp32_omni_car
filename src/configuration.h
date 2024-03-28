@@ -21,8 +21,8 @@
 #define LR_ENCODER_PIN_A 15
 #define LR_ENCODER_PIN_B 14
 
-#define RF_ENCODER_PIN_A 23
-#define RF_ENCODER_PIN_B 22
+#define RF_ENCODER_PIN_A 39 //23
+#define RF_ENCODER_PIN_B 35 //22
 
 #define ENCODER_ERROR 0.1
 
@@ -49,8 +49,8 @@
 #define LR_L298N_IN1 2
 #define LR_L298N_IN2 4
 
-#define RF_L298N_ENA 16
-#define RF_L298N_IN1 17
+#define RF_L298N_ENA 23 //39 //16
+#define RF_L298N_IN1 25 //35 //17
 #define RF_L298N_IN2 21
 
 // Pos PID configuration
@@ -81,6 +81,8 @@
 #define HEADER 200
 #define TAIL 199
 
+#define SERIAL_RX 16
+#define SERIAL_TX 17
 
 // tasks configuration
 #define MOTOR_CONTROL_CORE  1      // Using Core 1 for Motor Control
