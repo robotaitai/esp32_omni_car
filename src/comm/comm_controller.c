@@ -4,7 +4,7 @@
 #include "configuration.h"
 #include "comm_controller.h"
 
-
+extern Serial;
 
 void comm_controller_init(CommController *comm) {
     comm->comm_baud_rate = SERIAL_BAUDRATE;

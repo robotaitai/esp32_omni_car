@@ -173,62 +173,110 @@ void vehicleControlTask(void *parameter)
 ////////////////////////END OF  VEHICLE CONTROL TASK ///////////////////////////////////////////////
 
 //////////////////////// COMMUNICATION TASK ///////////////////////////////////////////////
+// void communicationTask(void *parameter)
+// {
+//   Vehicle *vehicle = (Vehicle *)parameter;
+//   TickType_t xLastWakeTime;
+//   const TickType_t xFrequency = pdMS_TO_TICKS(COMMUNICATION_DT * 1000);
+//   xLastWakeTime = xTaskGetTickCount();
+  
+//   for (;;)
+//   {
+
+//     vTaskDelayUntil(&xLastWakeTime, xFrequency);
+
+//     if (xSemaphoreTake(vehicleCurrentStateMutex, portMAX_DELAY))
+//     {
+//       Serial2.write(comm.TxData, SIZE_OF_TX_DATA); // Transmit data
+//       xSemaphoreGive(vehicleCurrentStateMutex);
+//     }
+
+//     if (Serial2.available() >= 0)
+//     {
+//       Serial2.readBytes(comm.RxData, SIZE_OF_RX_DATA); // Receive data
+//       int check = receiveData(&comm, vehicle);
+//       if (check == 2)
+//       {
+//         Serial2.flush();
+//         if (xSemaphoreTake(MotorUpdateMutex, portMAX_DELAY))
+//         {
+//           translate_twist_to_motor_commands(vehicle);
+//           xSemaphoreGive(MotorUpdateMutex);
+//         }
+//       }
+//     }
+//   }
+// }
+
 void communicationTask(void *parameter)
 {
-  Vehicle *vehicle = (Vehicle *)parameter;
-  TickType_t xLastWakeTime;
+  Vehicle *vehicle_ = (Vehicle *)parameter;
+  TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(COMMUNICATION_DT * 1000);
-  xLastWakeTime = xTaskGetTickCount();
-  
+
   for (;;)
   {
-
-    // if (Serial2.available())
-    // {
-    //   String incoming = Serial2.readStringUntil('\n');       // Read incoming string until newline
-    //   Serial.println("Received from external: " + incoming); // Debug print to Serial
-
-    //   // Here, add handling for incoming data, such as parsing commands
-    //   // and potentially responding or taking action
-    // }
-
-    // // Example: Sending a periodic message to the external device
-    // // This could be replaced or augmented by response logic based on incoming data
-    // static unsigned long lastSendTime = 0;
-    // if (millis() - lastSendTime > 1000)
-    // {                                      // Every 1000 ms
-    //   Serial2.println("Hello from ESP32"); // Send message to external device
-    //   lastSendTime = millis();
-    // }
-
-    // vTaskDelay(pdMS_TO_TICKS(10)); // Short delay to prevent task from hogging CPU
-    //END OF SERIAL 2 COMMUNICATION
-
     vTaskDelayUntil(&xLastWakeTime, xFrequency);
 
-    if (xSemaphoreTake(vehicleCurrentStateMutex, portMAX_DELAY))
+    if (Serial2.available() > 0)
     {
-      Serial2.write(comm.TxData, SIZE_OF_TX_DATA); // Transmit data
-      xSemaphoreGive(vehicleCurrentStateMutex);
-    }
 
-    if (Serial2.available() >= 0)
-    {
-      Serial2.readBytes(comm.RxData, SIZE_OF_RX_DATA); // Receive data
-      int check = receiveData(&comm, vehicle);
-      if (check == 2)
+      if (xSemaphoreTake(vehicleCurrentStateMutex, portMAX_DELAY))
       {
-        Serial2.flush();
-        if (xSemaphoreTake(MotorUpdateMutex, portMAX_DELAY))
+        Serial2.write(comm.TxData, SIZE_OF_TX_DATA); // Transmit data
+        xSemaphoreGive(vehicleCurrentStateMutex);
+      }
+      // Consider checking if the actual length matches SIZE_OF_RX_DATA
+      int len = Serial2.readBytes(comm.RxData, SIZE_OF_RX_DATA);
+      if (len == SIZE_OF_RX_DATA)
+      {
+        //Checksun test
+        // for (int j = 0; j < SIZE_OF_RX_DATA; j++)
+        // {
+        //   Serial.print(comm.RxData[j]);
+        //   Serial.print(",");
+        // }
+        // Serial.println("");
+
+        // uint8_t checksum = 0;
+        // for (int i = 3; i < 12; i++)
+        // {
+        //   checksum += comm.RxData[i];
+        // }
+        // Serial.println(checksum);
+
+        int check = receiveData(&comm, vehicle_);
+
+        if (check == 2)
         {
-          translate_twist_to_motor_commands(vehicle);
-          xSemaphoreGive(MotorUpdateMutex);
+          // Now it's safe to print updated values after processing
+          Serial.print("Updated Velocity X: ");
+          Serial.println(vehicle_->desired_state.velocity.x, 6);
+          Serial.print("Updated Velocity Y: ");
+          Serial.println(vehicle_->desired_state.velocity.y, 6);
+          Serial.print("Updated Angular Velocity: ");
+          Serial.println(vehicle_->desired_state.velocity.angular, 6);
+
+          // Use semaphore to synchronize vehicle state update
+          if (xSemaphoreTake(MotorUpdateMutex, portMAX_DELAY))
+          {
+            translate_twist_to_motor_commands(vehicle_);
+            xSemaphoreGive(MotorUpdateMutex);
+          }
         }
+      }
+      else
+      {
+        Serial.println("Incomplete data received.");
+      }
+      // Clearing buffer if needed
+      while (Serial2.available() > 0)
+      {
+        Serial2.read();
       }
     }
   }
 }
-
 
 /////////////////////////?TAIO COMM TASK ///////////////////////////////////////////////
 
