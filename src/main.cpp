@@ -250,12 +250,12 @@ void communicationTask(void *parameter)
         if (check == 2)
         {
           // Now it's safe to print updated values after processing
-          Serial.print("Updated Velocity X: ");
-          Serial.println(vehicle_->desired_state.velocity.x, 6);
-          Serial.print("Updated Velocity Y: ");
-          Serial.println(vehicle_->desired_state.velocity.y, 6);
-          Serial.print("Updated Angular Velocity: ");
-          Serial.println(vehicle_->desired_state.velocity.angular, 6);
+          // Serial.print("Updated Velocity X: ");
+          // Serial.println(vehicle_->desired_state.velocity.x, 6);
+          // Serial.print("Updated Velocity Y: ");
+          // Serial.println(vehicle_->desired_state.velocity.y, 6);
+          // Serial.print("Updated Angular Velocity: ");
+          // Serial.println(vehicle_->desired_state.velocity.angular, 6);
 
           // Use semaphore to synchronize vehicle state update
           if (xSemaphoreTake(MotorUpdateMutex, portMAX_DELAY))
@@ -484,11 +484,11 @@ void setup()
 
   if (taskCreated != pdPASS)
   {
-   // Serial.println("MotorControlTask creation failed!");
+   Serial.println("MotorControlTask creation failed!");
   }
   else
   {
-   // Serial.println("MotorControlTask creation success!");
+   Serial.println("MotorControlTask creation success!");
   }
 
   // Creating vehicleControlTask
@@ -503,11 +503,11 @@ void setup()
 
   if (taskCreated != pdPASS)
   {
-   // Serial.println("VehicleControlTask creation failed!");
+   Serial.println("VehicleControlTask creation failed!");
   }
   else
   {
-   // Serial.println("VehicleControlTask creation success!");
+   Serial.println("VehicleControlTask creation success!");
   }
 
   // Creating communicationTask
@@ -522,14 +522,14 @@ void setup()
 
   if (taskCreated != pdPASS)
   {
-   // Serial.println("CommunicationTask creation failed!");
+   Serial.println("CommunicationTask creation failed!");
   }
   else
   {
-   // Serial.println("CommunicationTask creation success!");
+   Serial.println("CommunicationTask creation success!");
   }
 
-  xTaskCreatePinnedToCore(
+  taskCreated = xTaskCreatePinnedToCore(
       SerialCommandTask,        // Task function
       "SerialCmdTask",          // Name of the task (for debugging)
       30000,                    // Stack size (bytes)
@@ -538,6 +538,14 @@ void setup()
       &SerialCommandTaskHandle, // Task handle
       COMMUNICATION_CORE        // Core you want to run the task on (0 or 1)
   );
+  if (taskCreated != pdPASS)
+  {
+    Serial.println("SerialCmdTask creation failed!");
+  }
+  else
+  {
+    Serial.println("SerialCmdTask creation success!");
+  }
 }
 
 void loop()
