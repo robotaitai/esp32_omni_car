@@ -76,5 +76,4 @@ void ProcessDataToSend(CommController *comm, const Vehicle *vehicle) {
     comm->TxData[51] = TAIL;
 
     // Send data
-   
 }

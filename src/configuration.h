@@ -72,7 +72,7 @@
 //timer configurations
 #define ODOMETRY_DT 0.005 // 200 Hz
 #define MOTOR_CONTROL_DT 0.002        // 500 Hz
-#define COMMUNICATION_DT 0.01  // 100 Hz
+#define COMMUNICATION_DT 0.05  // 20 Hz
 
 // communication configuration
 #define SERIAL_BAUDRATE 115200

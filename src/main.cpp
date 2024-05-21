@@ -13,6 +13,7 @@
 #include "hal/l298n.h"
 #include "comm/comm_controller.h"
 
+#define DEBUG 0
 // PID objects
 POS_PID pos_pid_left_front_motor;
 POS_PID pos_pid_right_front_motor;
@@ -207,7 +208,6 @@ void vehicleControlTask(void *parameter)
 //     }
 //   }
 // }
-
 void communicationTask(void *parameter)
 {
   Vehicle *vehicle_ = (Vehicle *)parameter;
@@ -220,60 +220,50 @@ void communicationTask(void *parameter)
 
     if (Serial2.available() > 0)
     {
+      Serial.println("Data available on Serial2");
 
-      if (xSemaphoreTake(vehicleCurrentStateMutex, portMAX_DELAY))
-      {
-        Serial2.write(comm.TxData, SIZE_OF_TX_DATA); // Transmit data
-        xSemaphoreGive(vehicleCurrentStateMutex);
-      }
-      // Consider checking if the actual length matches SIZE_OF_RX_DATA
       int len = Serial2.readBytes(comm.RxData, SIZE_OF_RX_DATA);
+      Serial.print("Read bytes: ");
+      Serial.println(len);
       if (len == SIZE_OF_RX_DATA)
       {
-        //Checksun test
-        // for (int j = 0; j < SIZE_OF_RX_DATA; j++)
-        // {
-        //   Serial.print(comm.RxData[j]);
-        //   Serial.print(",");
-        // }
-        // Serial.println("");
-
-        // uint8_t checksum = 0;
-        // for (int i = 3; i < 12; i++)
-        // {
-        //   checksum += comm.RxData[i];
-        // }
-        // Serial.println(checksum);
+        Serial.println("Received data from Serial2");
 
         int check = receiveData(&comm, vehicle_);
 
         if (check == 2)
         {
-          // Now it's safe to print updated values after processing
-          // Serial.print("Updated Velocity X: ");
-          // Serial.println(vehicle_->desired_state.velocity.x, 6);
-          // Serial.print("Updated Velocity Y: ");
-          // Serial.println(vehicle_->desired_state.velocity.y, 6);
-          // Serial.print("Updated Angular Velocity: ");
-          // Serial.println(vehicle_->desired_state.velocity.angular, 6);
-
-          // Use semaphore to synchronize vehicle state update
+          Serial.println("Valid data received");
           if (xSemaphoreTake(MotorUpdateMutex, portMAX_DELAY))
           {
             translate_twist_to_motor_commands(vehicle_);
             xSemaphoreGive(MotorUpdateMutex);
           }
         }
+        else
+        {
+          Serial.println("Checksum failed or data invalid");
+        }
       }
       else
       {
-        Serial.println("Incomplete data received.");
+        Serial.println("Incomplete data received");
       }
+
       // Clearing buffer if needed
       while (Serial2.available() > 0)
       {
         Serial2.read();
       }
+    }
+
+    if (xSemaphoreTake(vehicleCurrentStateMutex, portMAX_DELAY))
+    {
+      if (DEBUG)Serial.println("Preparing to transmit data");
+      ProcessDataToSend(&comm, vehicle_);
+      Serial2.write(comm.TxData, SIZE_OF_TX_DATA); // Transmit data
+      if (DEBUG)Serial.println("Data transmitted");
+      xSemaphoreGive(vehicleCurrentStateMutex);
     }
   }
 }
@@ -409,13 +399,27 @@ void SerialCommandTask(void *pvParameters)
 }
 ////////////////////////END OF COMMUNICATION TASK ///////////////////////////////////////////////
 /////////////////////////////
-
 void setup()
 {
-
   BaseType_t taskCreated;
 
-  // init vehicle PIDs
+  // Initialize Serial for debugging
+  Serial.begin(SERIAL_BAUDRATE);
+  while (!Serial)
+  {
+    // Wait for Serial to initialize
+  }
+  Serial.println("Serial initialized");
+
+  // Initialize Serial2 for communication
+  Serial2.begin(SERIAL_BAUDRATE, SERIAL_8N1, 16, 17);
+  while (!Serial2)
+  {
+    // Wait for Serial2 to initialize
+  }
+  Serial.println("Serial2 initialized");
+
+  // Initialize vehicle PIDs
   initPosPID(&pos_pid_x, POS_KP, POS_KI, POS_KD, POS_I_WINDUP);
   initPosPID(&pos_pid_y, POS_KP, POS_KI, POS_KD, POS_I_WINDUP);
   initPosPID(&pos_pid_angular, POS_KP, POS_KI, POS_KD, POS_I_WINDUP);
@@ -426,7 +430,7 @@ void setup()
 
   init_vehicle_pids(&vehicle_pids, vel_pid_x, vel_pid_y, vel_pid_angular, pos_pid_x, pos_pid_y, pos_pid_angular);
 
-  // init PIDs for each motor
+  // Initialize PIDs for each motor
   initPosPID(&pos_pid_left_front_motor, POS_KP, POS_KI, POS_KD, POS_I_WINDUP);
   initVelPID(&vel_pid_left_front_motor, VEL_KP, VEL_KI, VEL_KD, VEL_I_WINDUP);
 
@@ -439,32 +443,30 @@ void setup()
   initPosPID(&pos_pid_right_rear_motor, POS_KP, POS_KI, POS_KD, POS_I_WINDUP);
   initVelPID(&vel_pid_right_rear_motor, VEL_KP, VEL_KI, VEL_KD, VEL_I_WINDUP);
 
-  // init encoders
+  // Initialize encoders
   ESP32Encoder::useInternalWeakPullResistors = puType::up;
   initEncoder(&encoderLF, LF_ENCODER_PIN_A, LF_ENCODER_PIN_B);
   initEncoder(&encoderRR, RR_ENCODER_PIN_A, RR_ENCODER_PIN_B);
   initEncoder(&encoderLR, LR_ENCODER_PIN_A, LR_ENCODER_PIN_B);
   initEncoder(&encoderRF, RF_ENCODER_PIN_A, RF_ENCODER_PIN_B);
 
-  // init motor driver l298n
+  // Initialize motor drivers
   initL298N(&driverLF, LF_L298N_ENA, LF_L298N_IN1, LF_L298N_IN2);
   initL298N(&driverRR, RR_L298N_ENA, RR_L298N_IN1, RR_L298N_IN2);
   initL298N(&driverLR, LR_L298N_ENA, LR_L298N_IN1, LR_L298N_IN2);
   initL298N(&driverRF, RF_L298N_ENA, RF_L298N_IN1, RF_L298N_IN2);
 
-  // init motors
+  // Initialize motors
   initMotor(&left_front_motor, encoderLF, driverLF, pos_pid_left_front_motor, vel_pid_left_front_motor, LF_DIRECTION);
   initMotor(&right_front_motor, encoderRF, driverRF, pos_pid_right_front_motor, vel_pid_right_front_motor, RF_DIRECTION);
   initMotor(&left_rear_motor, encoderLR, driverLR, pos_pid_left_rear_motor, vel_pid_left_rear_motor, LR_DIRECTION);
   initMotor(&right_rear_motor, encoderRR, driverRR, pos_pid_right_rear_motor, vel_pid_right_rear_motor, RR_DIRECTION);
 
-  // init vehicle
+  // Initialize vehicle
   init_vehicle(&vehicle, left_front_motor, right_front_motor, left_rear_motor, right_rear_motor, vehicle_pids);
 
-  // init communication
+  // Initialize communication
   comm_controller_init(&comm);
-  Serial.begin(SERIAL_BAUDRATE);
-  Serial2.begin(SERIAL_BAUDRATE, SERIAL_8N1, 16, 17);
 
   // Create Mutex for Vehicle Data
   vehicleDesiredStateMutex = xSemaphoreCreateMutex();
@@ -472,7 +474,7 @@ void setup()
   vehicleCurrentStateMutex = xSemaphoreCreateMutex();
   MotorUpdateMutex = xSemaphoreCreateMutex();
 
-  // Creating motorControlTask
+  // Create motorControlTask
   taskCreated = xTaskCreatePinnedToCore(
       motorControlTask,        // Task function
       "MotorControlTask",      // Name of task
@@ -484,14 +486,14 @@ void setup()
 
   if (taskCreated != pdPASS)
   {
-   Serial.println("MotorControlTask creation failed!");
+    Serial.println("MotorControlTask creation failed!");
   }
   else
   {
-   Serial.println("MotorControlTask creation success!");
+    Serial.println("MotorControlTask creation success!");
   }
 
-  // Creating vehicleControlTask
+  // Create vehicleControlTask
   taskCreated = xTaskCreatePinnedToCore(
       vehicleControlTask,        // Task function
       "VehicleControlTask",      // Name of task
@@ -503,14 +505,14 @@ void setup()
 
   if (taskCreated != pdPASS)
   {
-   Serial.println("VehicleControlTask creation failed!");
+    Serial.println("VehicleControlTask creation failed!");
   }
   else
   {
-   Serial.println("VehicleControlTask creation success!");
+    Serial.println("VehicleControlTask creation success!");
   }
 
-  // Creating communicationTask
+  // Create communicationTask
   taskCreated = xTaskCreatePinnedToCore(
       communicationTask,        // Task function
       "CommunicationTask",      // Name of task
@@ -522,13 +524,14 @@ void setup()
 
   if (taskCreated != pdPASS)
   {
-   Serial.println("CommunicationTask creation failed!");
+    Serial.println("CommunicationTask creation failed!");
   }
   else
   {
-   Serial.println("CommunicationTask creation success!");
+    Serial.println("CommunicationTask creation success!");
   }
 
+  // Create SerialCommandTask
   taskCreated = xTaskCreatePinnedToCore(
       SerialCommandTask,        // Task function
       "SerialCmdTask",          // Name of the task (for debugging)
@@ -536,8 +539,8 @@ void setup()
       &vehicle,                 // Task input parameter
       2,                        // Priority of the task
       &SerialCommandTaskHandle, // Task handle
-      COMMUNICATION_CORE        // Core you want to run the task on (0 or 1)
-  );
+      COMMUNICATION_CORE);      // Core you want to run the task on (0 or 1)
+
   if (taskCreated != pdPASS)
   {
     Serial.println("SerialCmdTask creation failed!");
@@ -550,4 +553,5 @@ void setup()
 
 void loop()
 {
+  // Empty loop as tasks are managed by FreeRTOS
 }
