@@ -220,23 +220,29 @@ void communicationTask(void *parameter)
 
     if (Serial2.available() > 0)
     {
-      Serial.println("Data available on Serial2");
+      if (DEBUG)
+        Serial.println("Data available on Serial2");
 
       int len = Serial2.readBytes(comm.RxData, SIZE_OF_RX_DATA);
-      Serial.print("Read bytes: ");
-      Serial.println(len);
+      if (DEBUG)
+        Serial.print("Read bytes: ");
+      if (DEBUG)
+        Serial.println(len);
       if (len == SIZE_OF_RX_DATA)
       {
-        Serial.println("Received data from Serial2");
+        if (DEBUG)
+          Serial.println("Received data from Serial2");
 
         int check = receiveData(&comm, vehicle_);
 
         if (check == 2)
         {
-          Serial.println("Valid data received");
+          if (DEBUG)
+            Serial.println("Valid data received");
           if (xSemaphoreTake(MotorUpdateMutex, portMAX_DELAY))
           {
             translate_twist_to_motor_commands(vehicle_);
+            
             xSemaphoreGive(MotorUpdateMutex);
           }
         }
@@ -244,6 +250,7 @@ void communicationTask(void *parameter)
         {
           Serial.println("Checksum failed or data invalid");
         }
+        
       }
       else
       {
