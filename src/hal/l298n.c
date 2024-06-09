@@ -21,7 +21,7 @@ void move_forward(L298N *driver, float speed) {
     digitalWrite(driver->in2, LOW);
 }
 
-void move_backward(L298N *driver, float speed) {
+void move_backward(L298N *driver, float speed) {    
     speed = constrain(speed, 0, 255);
     analogWrite(driver->enA, speed);
     digitalWrite(driver->in1, LOW);
